@@ -12,8 +12,39 @@ setfend(char *fname)
   strcat(fname, ".html");
 }
 
+static DIR *
+eopendir(const char *dir)
+{
+  DIR *d = opendir(dir);
+  if (!d)
+  {
+    fprintf(stderr, "Cannot open dir: %s\n", dir);
+  }
+
+  return d;
+}
+
+static int
+strnjoin(const char *first, const char *sec, char *dest, int destsize)
+{
+  int firstlen = strlen(first);
+  int seclen = strlen(sec);
+  if (firstlen + seclen + 1 > destsize)
+  {
+    fprintf(stderr, "Dest must hold atleast '%d' chars", firstlen +  seclen + 1);
+    return -1;
+  }
+
+  strncpy(dest, first, destsize);
+  int restsize = destsize - firstlen - 1;
+  strncat(dest, sec, restsize);
+  dest[firstlen + seclen] = '\0';
+
+  return 1;
+}
+
 static void
-rfile(char *fname, char dirpath[]) {
+makepagefile(char *fname, char *dirpath) {
   FILE *fp = fopen(fname, "r");
   char fileName[256];
   strcpy(fileName, fname);
@@ -52,16 +83,10 @@ rfile(char *fname, char dirpath[]) {
   fclose(nf);
 }
 
-int
-main(int argc, char *argv[]) {
-  char dirpath[] = "testdir/";
+static void
+makeallpagefiles(DIR *d, char *dirname)
+{
   struct dirent *dir;
-
-  DIR *d = opendir(dirpath);
-  if (!d)
-  {
-    fprintf(stderr, "Cannot open dir: %s\n", dirpath);
-  }
 
   while ((dir = readdir(d)) != NULL)
   {
@@ -69,19 +94,25 @@ main(int argc, char *argv[]) {
     || strstr(dir->d_name, ".html")) continue;
 
     char fullPath[256];
-    strcpy(fullPath, dirpath);
+    strcpy(fullPath, dirname);
     strcat(fullPath, dir->d_name);
 
-    rfile(fullPath, dirpath);
+    makepagefile(fullPath, dirname);
   }
   closedir(d);
 
-  d = opendir(dirpath);
+}
+
+static void
+makeindexfile(DIR *d, char *dirname)
+{
+  struct dirent *dir;
+  d = opendir(dirname);
   char fullPath[256];
-  strcpy(fullPath, dirpath);
+  strcpy(fullPath,dirname);
   strcat(fullPath, "index.html");
   FILE *ip = fopen(fullPath, "w");
-  fprintf(ip, "<!DOCTYPE html> <html lang=en> <head> <title>%s</title> <meta charset=UTF-8> <meta name=viewport content=width=device-width, initial-scale=1> <style> body { background-color: #292929; color: hsla(0, 0%%, 100%%, 0.9); display: flex; flex-direction: column; flex-wrap: wrap; } h1 { color: hsla(0, 0%%, 100%%, 0.9); width: 100%%; border: solid rgb(88, 88, 88); border-width: 0 0 2px 0; } </style> </head> <body> <h1>%s</h1> <table> <tr> <td>File</td> <td>Author</td> <td>Last changed</td> </tr>", dirpath, dirpath);
+  fprintf(ip, "<!DOCTYPE html> <html lang=en> <head> <title>%s</title> <meta charset=UTF-8> <meta name=viewport content=width=device-width, initial-scale=1> <style> body { background-color: #292929; color: hsla(0, 0%%, 100%%, 0.9); display: flex; flex-direction: column; flex-wrap: wrap; } h1 { color: hsla(0, 0%%, 100%%, 0.9); width: 100%%; border: solid rgb(88, 88, 88); border-width: 0 0 2px 0; } </style> </head> <body> <h1>%s</h1> <table> <tr> <td>File</td> <td>Author</td> <td>Last changed</td> </tr>", dirname, dirname);
 
   while((dir = readdir(d)) != NULL)
   {
@@ -89,7 +120,7 @@ main(int argc, char *argv[]) {
     || strstr(dir->d_name, ".html")) continue;
 
     char fullfilepath[255];
-    strcpy(fullfilepath, dirpath);
+    strcpy(fullfilepath, dirname);
     strcat(fullfilepath, dir->d_name);
 
     struct stat filestat;
@@ -102,4 +133,20 @@ main(int argc, char *argv[]) {
   fprintf(ip, "</table> </body> </html>");
   closedir(d);
   fclose(ip);
+}
+
+int
+main(int argc, char *argv[]) {
+  char dirname[256];
+
+  if (!argv[1])
+  {
+    fprintf(stderr, "Please provide a directory\n");
+    exit(1);
+  }
+  strncpy(dirname, argv[1], sizeof(dirname));
+
+  DIR *sourcedir = eopendir(dirname);
+  makeallpagefiles(sourcedir, dirname);
+  makeindexfile(sourcedir, dirname);
 }
