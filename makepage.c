@@ -1,3 +1,4 @@
+#include "str.h"
 #include <dirent.h>
 #include <pwd.h>
 #include <stdio.h>
@@ -11,8 +12,8 @@ eopendir(const char *dir)
 {
         DIR *d = opendir(dir);
         if (!d) {
-        fprintf(stderr, "Cannot open dir: %s\n", dir);
-        exit(1);
+                fprintf(stderr, "Cannot open dir: %s\n", dir);
+                exit(1);
         };
 
         return d;
@@ -23,41 +24,20 @@ efopen(const char *file, const char *mode)
 {
         FILE *fp = fopen(file, mode);
         if (!fp) {
-        fprintf(stderr, "Cannot open file: %s\n", file);
-        exit(1);
-        } 
-
-        return fp;
-}
-
-static int
-strnjoin(const char *first, const char *sec, char *dest, int destsize)
-{
-        int firstlen = strlen(first);
-        int seclen = strlen(sec);
-        if (firstlen + seclen + 1 > destsize) {
-                fprintf(stderr, "Dest must hold atleast '%d' chars",
-                        firstlen + seclen + 1);
-                return -1;
+                fprintf(stderr, "Cannot open file: %s\n", file);
+                exit(1);
         }
 
-        strncpy(dest, first, destsize);
-        int restsize = destsize - firstlen - 1;
-        strncat(dest, sec, restsize);
-        dest[firstlen + seclen] = '\0';
-
-        return 1;
+        return fp;
 }
 
 static void
 makepagefile(char *fname, char *dirpath)
 {
         char pagefile[256];
-
         FILE *codefp = efopen(fname, "r");
+        strnjoin(fname, ".html", pagefile, ARR_LEN(pagefile));
         FILE *pagefp = efopen(pagefile, "w");
-
-        strnjoin(fname, ".html", pagefile, sizeof(pagefile));
 
         fprintf(
             pagefp,
@@ -82,11 +62,39 @@ makepagefile(char *fname, char *dirpath)
             "class=code>",
             dirpath, dirpath, pagefile);
 
-        char lineBuff[1000];
+        char lineBuff[1000] = {0};
+        char *lt = "<";
+        char *gt = ">";
+        char *fourspaces = "    ";
         int i = 1;
-        while (fgets(lineBuff, 1000, codefp) != NULL) {
+
+        while (fgets(lineBuff, ARR_LEN(lineBuff), codefp) != NULL) {
+                if (strstr(lineBuff, lt) && strstr(lineBuff, gt)) {
+                        char parse[1000] = {0};
+                        char parsesec[1000] = {0};
+
+                        char *ltesc = "&lt;";
+                        char *gtesc = "&gt;";
+
+                        strnrpl(lineBuff, lt, ltesc, parse, ARR_LEN(parse));
+                        strnrpl(parse, gt, gtesc, parsesec, ARR_LEN(parsesec));
+
+                        fprintf(pagefp,
+                                "<div><a href=#l%d "
+                                "id=l%d>%d</a>%s</div>",
+                                i, i, i, parse);
+                        goto increment;
+                }
+                if (strstr(lineBuff, fourspaces)) {
+                        fprintf(pagefp,
+                                "<div><a href=#l%d "
+                                "id=l%d>%d</a>&emsp;&emsp;%s</div>",
+                                i, i, i, lineBuff);
+                        goto increment;
+                }
                 fprintf(pagefp, "<div><a href=#l%d id=l%d>%d</a>%s</div>", i,
                         i, i, lineBuff);
+        increment:
                 i++;
         }
         fprintf(pagefp, "%s", "</div></body></html>");
