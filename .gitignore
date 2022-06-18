@@ -3,3 +3,4 @@ makepage
 index.html
 template.html
 .vscode
+*.o
