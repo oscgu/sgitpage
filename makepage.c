@@ -6,19 +6,28 @@
 #include <sys/stat.h>
 #include <time.h>
 
-static void
-setfend(char *fname)
-{
-        strcat(fname, ".html");
-}
-
 static DIR *
 eopendir(const char *dir)
 {
         DIR *d = opendir(dir);
-        if (!d) { fprintf(stderr, "Cannot open dir: %s\n", dir); }
+        if (!d) {
+        fprintf(stderr, "Cannot open dir: %s\n", dir);
+        exit(1);
+        };
 
         return d;
+}
+
+static FILE *
+efopen(const char *file, const char *mode)
+{
+        FILE *fp = fopen(file, mode);
+        if (!fp) {
+        fprintf(stderr, "Cannot open file: %s\n", file);
+        exit(1);
+        } 
+
+        return fp;
 }
 
 static int
@@ -43,22 +52,15 @@ strnjoin(const char *first, const char *sec, char *dest, int destsize)
 static void
 makepagefile(char *fname, char *dirpath)
 {
-        FILE *fp = fopen(fname, "r");
-        char fileName[256];
-        strcpy(fileName, fname);
-        char lineBuff[1000];
-        int dirpathlen = strlen(dirpath);
-        char dirname[dirpathlen];
-        strcpy(dirname, dirpath);
-        dirname[dirpathlen - 1] = '\0';
+        char pagefile[256];
 
-        setfend(fname);
-        FILE *nf = fopen(fname, "w");
+        FILE *codefp = efopen(fname, "r");
+        FILE *pagefp = efopen(pagefile, "w");
 
-        if (!fp || !nf) { fprintf(stderr, "Cannot open file: %s\n", fname); }
+        strnjoin(fname, ".html", pagefile, sizeof(pagefile));
 
         fprintf(
-            nf,
+            pagefp,
             "<!DOCTYPE html><html lang=en><head><title>%s"
             "</title><meta charset=UTF-8><meta name=viewport "
             "content=width=device-width initial-scale=1> <style> body { "
@@ -78,21 +80,23 @@ makepagefile(char *fname, char *dirpath)
             "background-color: #3d3d3d; } </style></head><body> <h1>%s"
             "</h1><a href=index.html>Menu</a> <p>File: %s</p> <div "
             "class=code>",
-            dirname, dirname, fileName);
+            dirpath, dirpath, pagefile);
+
+        char lineBuff[1000];
         int i = 1;
-        while (fgets(lineBuff, 1000, fp) != NULL) {
-                fprintf(nf, "<div><a href=#l%d id=l%d>%d</a>%s</div>", i, i, i,
-                        lineBuff);
+        while (fgets(lineBuff, 1000, codefp) != NULL) {
+                fprintf(pagefp, "<div><a href=#l%d id=l%d>%d</a>%s</div>", i,
+                        i, i, lineBuff);
                 i++;
         }
-        fprintf(nf, "%s", "</div></body></html>");
+        fprintf(pagefp, "%s", "</div></body></html>");
 
-        fclose(fp);
-        fclose(nf);
+        fclose(codefp);
+        fclose(pagefp);
 }
 
 static void
-makeallpagefiles(DIR *d, char *dirname)
+makefilesindir(DIR *d, char *dirname)
 {
         struct dirent *dir;
 
@@ -166,6 +170,6 @@ main(int argc, char *argv[])
         strncpy(dirname, argv[1], sizeof(dirname));
 
         DIR *sourcedir = eopendir(dirname);
-        makeallpagefiles(sourcedir, dirname);
+        makefilesindir(sourcedir, dirname);
         makeindexfile(sourcedir, dirname);
 }
